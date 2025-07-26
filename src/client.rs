@@ -42,7 +42,10 @@ impl Client {
 
     fn custom_header(&self, name: &str, value: &str) -> header::HeaderMap {
         let mut headers = header::HeaderMap::new();
-        headers.insert(header::HeaderName::from_bytes(name.as_bytes()).unwrap(), header::HeaderValue::from_bytes(value.as_bytes()).unwrap());
+        headers.insert(
+            header::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+            header::HeaderValue::from_bytes(value.as_bytes()).unwrap(),
+        );
         headers
     }
 
@@ -64,8 +67,7 @@ impl Client {
     ///
     /// Use absolute path to the webdav server file location
     pub fn get(&self, path: &str) -> Result<Response, Error> {
-        self.start_request(Method::GET, path)
-            .send()
+        self.start_request(Method::GET, path).send()
     }
 
     /// Upload a file/zip on Webdav server
@@ -85,8 +87,7 @@ impl Client {
     ///
     /// Use absolute path to the webdav server file location
     pub fn delete(&self, path: &str) -> Result<Response, Error> {
-        self.start_request(Method::DELETE, path)
-            .send()
+        self.start_request(Method::DELETE, path).send()
     }
 
     /// Unzips the .zip archieve on Webdav server
@@ -145,7 +146,7 @@ mod tests {
     const USER_FOLDER: &str = "User287e257";
 
     fn get_server_path(path: &str) -> String {
-        format!("{0}/{1}/{2}", SERVER_URL, USER_FOLDER, path)
+        format!("{SERVER_URL}/{USER_FOLDER}/{path}")
     }
 
     fn get_client() -> Client {
@@ -157,15 +158,18 @@ mod tests {
         let webdav_client = get_client();
         let result = webdav_client.mkcol(get_server_path("rustydav").as_str());
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_2_put() {
         let webdav_client = get_client();
-        let result = webdav_client.put("rustydav is a cool small library", get_server_path("rustydav/test.txt").as_str());
+        let result = webdav_client.put(
+            "rustydav is a cool small library",
+            get_server_path("rustydav/test.txt").as_str(),
+        );
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -173,15 +177,18 @@ mod tests {
         let webdav_client = get_client();
         let result = webdav_client.get(get_server_path("rustydav/test.txt").as_str());
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_4_mv() {
         let webdav_client = get_client();
-        let result = webdav_client.mv(get_server_path("rustydav/test.txt").as_str(), get_server_path("test.txt").as_str());
+        let result = webdav_client.mv(
+            get_server_path("rustydav/test.txt").as_str(),
+            get_server_path("test.txt").as_str(),
+        );
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -189,7 +196,7 @@ mod tests {
         let webdav_client = get_client();
         let result = webdav_client.delete(get_server_path("test.txt").as_str());
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -197,7 +204,7 @@ mod tests {
         let webdav_client = get_client();
         let result = webdav_client.unzip(get_server_path("test.zip").as_str());
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -205,6 +212,6 @@ mod tests {
         let webdav_client = get_client();
         let result = webdav_client.list(get_server_path("").as_str(), "0");
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 }
