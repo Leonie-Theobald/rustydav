@@ -1,0 +1,3 @@
+- install Go's webdav server `go install github.com/hacdias/webdav/v5@latest`
+- navigate to this location in your terminal
+- run server with `~/go/bin/webdav --config ./config.yaml`

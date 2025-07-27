@@ -142,79 +142,171 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        fs::{copy, create_dir, remove_dir_all, File},
+        io::{Read, Write},
+        path::Path,
+    };
 
-    const SERVER_URL: &str = "https://www.webdavserver.com";
-    const USER_FOLDER: &str = "User287e257";
+    const SERVER_URL: &str = "http://localhost:6065";
 
     fn get_server_path(path: &str) -> String {
-        format!("{SERVER_URL}/{USER_FOLDER}/{path}")
+        format!("{SERVER_URL}/{path}")
     }
 
     fn get_client() -> Client {
-        Client::init("", "")
+        Client::init("test", "password")
+    }
+
+    fn reset_webdav_server_directories() {
+        let test_folder = "webdav_server/tests/";
+        if let Err(err) = remove_dir_all(test_folder) {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                panic!("Couldn't remove all directories and files due to {}", err);
+            }
+        }
+
+        if let Err(err) = create_dir(test_folder) {
+            panic!("Couldn't create fresh test directory due to {}", err);
+        }
+    }
+
+    fn create_zipped_file() {
+        copy("webdav_server/test.zip", "webdav_server/tests/test.zip")
+            .expect("Couldn't create zip file");
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_1_mkcol() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+
         let webdav_client = get_client();
 
-        let result = webdav_client.mkcol(&get_server_path("new_collection"));
+        let result = webdav_client
+            .mkcol(&get_server_path("new_collection"))
+            .expect("Response failed");
 
-        assert!(result.is_ok());
+        assert_eq!(reqwest::StatusCode::CREATED, result.status());
+        assert!(Path::new("webdav_server/tests/new_collection").exists());
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_2_put() {
-        let webdav_client = get_client();
-        let result = webdav_client.put(
-            "rustydav is a cool small library",
-            &get_server_path("test.txt"),
-        );
+        // preparation of webdav server
+        reset_webdav_server_directories();
 
-        assert!(result.is_ok());
+        let webdav_client = get_client();
+
+        let result = webdav_client
+            .put("Hello World!", &get_server_path("test.txt"))
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::CREATED, result.status());
+        assert!(Path::new("webdav_server/tests/test.txt").exists());
+
+        let mut file = File::open("webdav_server/tests/test.txt").expect("Couldn't open file");
+        let mut file_content = String::new();
+        File::read_to_string(&mut file, &mut file_content).expect("Couldn't read file");
+        assert_eq!(&file_content, "Hello World!");
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_3_get() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        let mut file =
+            File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
+        file.write_all(b"Hello World!")
+            .expect("Couldn't write content to file");
+
         let webdav_client = get_client();
 
-        let result = webdav_client.get(&get_server_path("test.txt"));
+        let result = webdav_client
+            .get(&get_server_path("test.txt"))
+            .expect("Response failed");
 
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_4_mv() {
-        let webdav_client = get_client();
-        let result = webdav_client.mv(
-            &get_server_path("test.txt"),
-            &get_server_path("target/test.txt"),
+        assert_eq!(reqwest::StatusCode::OK, result.status());
+        assert_eq!(
+            result.text().expect("Couldn't read response text"),
+            "Hello World!"
         );
-
-        assert!(result.is_ok());
     }
 
     #[test]
+    #[serial_test::serial]
+    fn test_4_mv() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
+        create_dir("webdav_server/tests/target/").expect("Couldn't create directory");
+
+        let webdav_client = get_client();
+
+        let result = webdav_client
+            .mv(
+                &get_server_path("test.txt"),
+                &get_server_path("target/test.txt"),
+            )
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::CREATED, result.status());
+        assert!(!Path::new("webdav_server/tests/test.txt").exists());
+        assert!(Path::new("webdav_server/tests/target/test.txt").exists());
+    }
+
+    #[test]
+    #[serial_test::serial]
     fn test_5_delete() {
-        let webdav_client = get_client();
-        let result = webdav_client.delete(&get_server_path("test.txt"));
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
 
-        assert!(result.is_ok());
+        let webdav_client = get_client();
+
+        let result = webdav_client
+            .delete(&get_server_path("test.txt"))
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::NO_CONTENT, result.status());
+        assert!(!Path::new("webdav_server/tests/test.txt").exists());
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_6_unzip() {
-        let webdav_client = get_client();
-        let result = webdav_client.unzip(&get_server_path("test.zip"));
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        create_zipped_file();
 
-        assert!(result.is_ok());
+        let webdav_client = get_client();
+        let result = webdav_client
+            .unzip(&get_server_path("test.zip"))
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::OK, result.status());
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_7_list() {
-        let webdav_client = get_client();
-        let result = webdav_client.list(&get_server_path(""), "0");
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        File::create("webdav_server/tests/test_1.txt").expect("Couldn't create new file");
+        File::create("webdav_server/tests/test_2.txt").expect("Couldn't create new file");
 
-        assert!(result.is_ok());
+        let webdav_client = get_client();
+
+        let result = webdav_client
+            .list(&get_server_path(""), "1")
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::MULTI_STATUS, result.status());
+        let result_text = result.text().expect("Couldn't read response text");
+        assert!(result_text.contains("test_1.txt"));
+        assert!(result_text.contains("test_2.txt"));
     }
 }
