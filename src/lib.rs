@@ -54,4 +54,5 @@
 extern crate reqwest;
 
 pub mod client;
+pub mod error;
 pub mod prelude;

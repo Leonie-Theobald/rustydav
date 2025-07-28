@@ -20,6 +20,7 @@
 //! ```
 
 use super::prelude::*;
+use crate::error::WebdavError;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -67,10 +68,11 @@ impl Client {
     /// Get a file from Webdav server
     ///
     /// Use absolute path to the webdav server file location
-    pub fn get(&self, path: &str) -> Result<Response, Error> {
+    pub fn get(&self, path: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::GET, path)
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
     }
 
     /// Upload a file/zip on Webdav server
@@ -79,40 +81,44 @@ impl Client {
     /// This can be achieved with **std::fs::File** or **zip-rs** for sending zip files.
     ///
     /// Use absolute path to the webdav server folder location
-    pub fn put<B: Into<Body>>(&self, body: B, path: &str) -> Result<Response, Error> {
+    pub fn put<B: Into<Body>>(&self, body: B, path: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::PUT, path)
             .headers(self.custom_header("content-type", "application/octet-stream"))
             .body(body)
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
     }
 
     /// Deletes the collection, file, folder or zip archive at the given path on Webdav server
     ///
     /// Use absolute path to the webdav server file location
-    pub fn delete(&self, path: &str) -> Result<Response, Error> {
+    pub fn delete(&self, path: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::DELETE, path)
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
     }
 
     /// Unzips the .zip archieve on Webdav server
     ///
     /// Use absolute path to the webdav server file location
-    pub fn unzip(&self, path: &str) -> Result<Response, Error> {
+    pub fn unzip(&self, path: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::POST, path)
             .form(&self.form_params("method", "UNZIP"))
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
     }
 
     /// Creates a directory on Webdav server
     ///
     /// Use absolute path to the webdav server file location
-    pub fn mkcol(&self, path: &str) -> Result<Response, Error> {
+    pub fn mkcol(&self, path: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::from_bytes(b"MKCOL").unwrap(), path)
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
     }
 
     /// Rename or move a collection, file, folder on Webdav server
@@ -120,11 +126,12 @@ impl Client {
     /// If the file location changes it will move the file, if only the file name changes it will rename it.
     ///
     /// Use absolute path to the webdav server file location
-    pub fn mv(&self, from: &str, to: &str) -> Result<Response, Error> {
+    pub fn mv(&self, from: &str, to: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::from_bytes(b"MOVE").unwrap(), from)
             .headers(self.custom_header("destination", to))
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
     }
 
     /// List files and folders at the given path on Webdav server
@@ -133,7 +140,7 @@ impl Client {
     /// The result will contain an xml list with the remote folder contents.
     ///
     /// Use absolute path to the webdav server folder location
-    pub fn list(&self, path: &str, depth: &str) -> Result<Response, Error> {
+    pub fn list(&self, path: &str, depth: &str) -> Result<Response, WebdavError> {
         let body = r#"<?xml version="1.0" encoding="utf-8" ?>
             <D:propfind xmlns:D="DAV:">
                 <D:allprop/>
@@ -145,6 +152,7 @@ impl Client {
             .body(body)
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
     }
 }
 
