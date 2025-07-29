@@ -55,5 +55,7 @@ extern crate reqwest;
 
 pub mod client;
 pub mod error;
+#[cfg(feature = "locking")]
+pub mod file_lock;
 pub mod header;
 pub mod prelude;

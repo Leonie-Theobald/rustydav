@@ -13,6 +13,9 @@ readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+locking = []
+
 [dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }
 

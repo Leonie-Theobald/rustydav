@@ -20,6 +20,8 @@
 //! ```
 
 use super::prelude::*;
+#[cfg(feature = "locking")]
+use crate::file_lock::LockToken;
 use crate::{error::WebdavError, header::HeaderBuilder};
 use std::collections::HashMap;
 
@@ -160,11 +162,57 @@ impl Client {
             .error_for_status()
             .map_err(WebdavError::RequestFailed)
     }
+
+    /// Try to lock resource at the given path on Webdav server
+    #[cfg(feature = "locking")]
+    pub fn lock(&self, path: &str, duration: &str) -> Result<(LockToken, Response), WebdavError> {
+        let body = r#"<?xml version="1.0" encoding="utf-8" ?>
+            <D:lockinfo xmlns:D='DAV:'>
+                <D:lockscope><D:exclusive/></D:lockscope>
+                <D:locktype><D:write/></D:locktype>
+                <D:owner>
+                    <D:href>http://example.org/~ejw/contact.html</D:href>
+                </D:owner>
+            </D:lockinfo>"#;
+
+        let response = self
+            .start_request(Method::from_bytes(b"LOCK").unwrap(), path)
+            .headers(
+                HeaderBuilder::new()
+                    .add_item("timeout", duration)
+                    .unwrap()
+                    .build(),
+            )
+            .body(body)
+            .send()?
+            .error_for_status()?;
+
+        match LockToken::extract_from_response(&response) {
+            None => Err(WebdavError::LockingFailed),
+            Some(lock_token) => Ok((lock_token, response)),
+        }
+    }
+
+    /// Try to unlock resource with a lock token at the given path on Webdav server
+    #[cfg(feature = "locking")]
+    pub fn unlock(&self, path: &str, lock_token: &LockToken) -> Result<Response, WebdavError> {
+        self.start_request(Method::from_bytes(b"UNLOCK").unwrap(), path)
+            .headers(
+                HeaderBuilder::new()
+                    .add_item("lock-token", &lock_token.to_string())
+                    .unwrap()
+                    .build(),
+            )
+            .send()
+            .map_err(WebdavError::RequestFailed)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
+    use std::time::Duration;
     use std::{
         fs::{copy, create_dir, remove_dir_all, File},
         io::{Read, Write},
@@ -331,5 +379,62 @@ mod tests {
         let result_text = result.text().expect("Couldn't read response text");
         assert!(result_text.contains("test_1.txt"));
         assert!(result_text.contains("test_2.txt"));
+    }
+
+    #[cfg(feature = "locking")]
+    #[test]
+    #[serial_test::serial]
+    fn test_8_lock() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
+
+        let webdav_client = get_client();
+
+        // Locking
+        let (_lock_token, result_first_locking) = webdav_client
+            .lock(&get_server_path("test.txt"), "Second-1")
+            .expect("Should retrieve any response for first locking");
+
+        assert_eq!(reqwest::StatusCode::OK, result_first_locking.status());
+
+        // Try locking second time
+        let error_second_locking = webdav_client
+            .lock(&get_server_path("test.txt"), "Second-1")
+            .expect_err("Second locking should fail");
+
+        assert!(matches!(
+            error_second_locking,
+            WebdavError::RequestFailed(..)
+        ));
+
+        thread::sleep(Duration::from_secs(1));
+    }
+
+    #[cfg(feature = "locking")]
+    #[test]
+    #[serial_test::serial]
+    fn test_9_lock_and_unlock() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
+
+        let webdav_client = get_client();
+
+        // Locking
+        let (lock_token, result_locking) = webdav_client
+            .lock(&get_server_path("test.txt"), "Second-1")
+            .expect("Should retrieve any response for first locking");
+
+        assert_eq!(reqwest::StatusCode::OK, result_locking.status());
+
+        // Unlocking
+        let result_unlocking = webdav_client
+            .unlock(&get_server_path("test.txt"), &lock_token)
+            .expect("Should retrieve any response for first locking");
+
+        assert_eq!(reqwest::StatusCode::NO_CONTENT, result_unlocking.status());
+
+        thread::sleep(Duration::from_secs(1));
     }
 }
