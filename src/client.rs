@@ -88,6 +88,28 @@ impl Client {
             .map_err(WebdavError::RequestFailed)
     }
 
+    #[cfg(feature = "locking")]
+    /// put method that also presents a lock token during server call
+    pub fn put_for_locked<B: Into<Body>>(
+        &self,
+        body: B,
+        path: &str,
+        lock_token: &LockToken,
+    ) -> Result<Response, WebdavError> {
+        self.start_request(Method::PUT, path)
+            .headers(
+                HeaderBuilder::new()
+                    .add_item("content-type", "application/octet-stream")
+                    .unwrap()
+                    .add_lock_token(lock_token)
+                    .unwrap()
+                    .build(),
+            )
+            .body(body)
+            .send()
+            .map_err(WebdavError::RequestFailed)
+    }
+
     /// Deletes the collection, file, folder or zip archive at the given path on Webdav server
     ///
     /// Use absolute path to the webdav server file location
@@ -95,6 +117,23 @@ impl Client {
         self.start_request(Method::DELETE, path)
             .send()?
             .error_for_status()
+            .map_err(WebdavError::RequestFailed)
+    }
+
+    #[cfg(feature = "locking")]
+    pub fn delete_for_locked(
+        &self,
+        path: &str,
+        lock_token: &LockToken,
+    ) -> Result<Response, WebdavError> {
+        self.start_request(Method::DELETE, path)
+            .headers(
+                HeaderBuilder::new()
+                    .add_lock_token(lock_token)
+                    .unwrap()
+                    .build(),
+            )
+            .send()
             .map_err(WebdavError::RequestFailed)
     }
 
@@ -286,6 +325,75 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
+    fn test_2a_put_to_existing() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        let mut file =
+            File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
+        file.write_all(b"Hello World!")
+            .expect("Couldn't write content to file");
+
+        let webdav_client = get_client();
+
+        let result = webdav_client
+            .put("Hello there!", &get_server_path("test.txt"))
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::CREATED, result.status());
+        assert!(Path::new("webdav_server/tests/test.txt").exists());
+
+        let mut file = File::open("webdav_server/tests/test.txt").expect("Couldn't open file");
+        let mut file_content = String::new();
+        File::read_to_string(&mut file, &mut file_content).expect("Couldn't read file");
+        assert_eq!(&file_content, "Hello there!");
+    }
+
+    #[cfg(feature = "locking")]
+    #[test]
+    #[serial_test::serial]
+    fn test_2b_lock_and_put() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
+
+        let webdav_client = get_client();
+
+        // Locking
+        let (lock_token, result_locking) = webdav_client
+            .lock(&get_server_path("test.txt"), "Second-1")
+            .expect("Should retrieve any response for locking");
+        assert_eq!(reqwest::StatusCode::OK, result_locking.status());
+
+        // try normal put method
+        let result = webdav_client
+            .put("Hello World!", get_server_path("test.txt").as_str())
+            .expect_err("Put should require lock token");
+
+        assert!(matches!(result, WebdavError::RequestFailed(_)));
+
+        let mut file = File::open("webdav_server/tests/test.txt").expect("Couldn't open file");
+        let mut file_content = String::new();
+        File::read_to_string(&mut file, &mut file_content).expect("Couldn't read file");
+        assert_eq!(&file_content, "");
+
+        // try put method with lock token
+        let result = webdav_client
+            .put_for_locked("Hello World!", &get_server_path("test.txt"), &lock_token)
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::CREATED, result.status());
+        assert!(Path::new("webdav_server/tests/test.txt").exists());
+
+        let mut file = File::open("webdav_server/tests/test.txt").expect("Couldn't open file");
+        let mut file_content = String::new();
+        File::read_to_string(&mut file, &mut file_content).expect("Couldn't read file");
+        assert_eq!(&file_content, "Hello World!");
+
+        thread::sleep(Duration::from_secs(1));
+    }
+
+    #[test]
+    #[serial_test::serial]
     fn test_3_get() {
         // preparation of webdav server
         reset_webdav_server_directories();
@@ -344,6 +452,40 @@ mod tests {
 
         assert_eq!(reqwest::StatusCode::NO_CONTENT, result.status());
         assert!(!Path::new("webdav_server/tests/test.txt").exists());
+    }
+
+    #[cfg(feature = "locking")]
+    #[test]
+    #[serial_test::serial]
+    fn test_5a_lock_and_delete() {
+        // preparation of webdav server
+        reset_webdav_server_directories();
+        File::create("webdav_server/tests/test.txt").expect("Couldn't create new file");
+
+        let webdav_client = get_client();
+
+        // Locking
+        let (lock_token, result_locking) = webdav_client
+            .lock(&get_server_path("test.txt"), "Second-1")
+            .expect("Should retrieve any response for locking");
+        assert_eq!(reqwest::StatusCode::OK, result_locking.status());
+
+        let result = webdav_client
+            .delete(get_server_path("test.txt").as_str())
+            .expect_err("Delete should require lock token");
+
+        assert!(matches!(result, WebdavError::RequestFailed(_)));
+        assert!(Path::new("webdav_server/tests/test.txt").exists());
+
+        // try put method with lock token
+        let result = webdav_client
+            .delete_for_locked(&get_server_path("test.txt"), &lock_token)
+            .expect("Response failed");
+
+        assert_eq!(reqwest::StatusCode::NO_CONTENT, result.status());
+        assert!(!Path::new("webdav_server/tests/test.txt").exists());
+
+        thread::sleep(Duration::from_secs(1));
     }
 
     #[test]
