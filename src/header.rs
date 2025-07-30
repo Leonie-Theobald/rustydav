@@ -1,3 +1,5 @@
+#[cfg(feature = "locking")]
+use crate::file_lock::LockToken;
 use crate::{
     error::WebdavError,
     prelude::header::{HeaderMap, HeaderName, HeaderValue},
@@ -28,5 +30,10 @@ impl HeaderBuilder {
         );
 
         Ok(self)
+    }
+
+    #[cfg(feature = "locking")]
+    pub fn add_lock_token(self, lock_token: &LockToken) -> Result<Self, WebdavError> {
+        self.add_item("if", &format!("({lock_token})"))
     }
 }
