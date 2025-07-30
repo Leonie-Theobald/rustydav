@@ -4,6 +4,7 @@ pub enum WebdavError {
     RequestFailed(reqwest::Error),
     LockingFailed,
     UnLockingFailed,
+    HeaderElementInvalid,
 }
 
 impl From<reqwest::Error> for WebdavError {

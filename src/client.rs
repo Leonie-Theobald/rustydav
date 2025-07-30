@@ -20,7 +20,7 @@
 //! ```
 
 use super::prelude::*;
-use crate::error::WebdavError;
+use crate::{error::WebdavError, header::HeaderBuilder};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -40,15 +40,6 @@ impl Client {
             password: password.to_owned(),
             client: reqwest::blocking::Client::new(),
         }
-    }
-
-    fn custom_header(&self, name: &str, value: &str) -> header::HeaderMap {
-        let mut headers = header::HeaderMap::new();
-        headers.insert(
-            header::HeaderName::from_bytes(name.as_bytes()).unwrap(),
-            header::HeaderValue::from_bytes(value.as_bytes()).unwrap(),
-        );
-        headers
     }
 
     fn form_params(&self, key: &'static str, value: &'static str) -> HashMap<&str, &str> {
@@ -83,7 +74,12 @@ impl Client {
     /// Use absolute path to the webdav server folder location
     pub fn put<B: Into<Body>>(&self, body: B, path: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::PUT, path)
-            .headers(self.custom_header("content-type", "application/octet-stream"))
+            .headers(
+                HeaderBuilder::new()
+                    .add_item("content-type", "application/octet-stream")
+                    .unwrap()
+                    .build(),
+            )
             .body(body)
             .send()?
             .error_for_status()
@@ -128,7 +124,12 @@ impl Client {
     /// Use absolute path to the webdav server file location
     pub fn mv(&self, from: &str, to: &str) -> Result<Response, WebdavError> {
         self.start_request(Method::from_bytes(b"MOVE").unwrap(), from)
-            .headers(self.custom_header("destination", to))
+            .headers(
+                HeaderBuilder::new()
+                    .add_item("destination", to)
+                    .unwrap()
+                    .build(),
+            )
             .send()?
             .error_for_status()
             .map_err(WebdavError::RequestFailed)
@@ -148,7 +149,12 @@ impl Client {
         "#;
 
         self.start_request(Method::from_bytes(b"PROPFIND").unwrap(), path)
-            .headers(self.custom_header("depth", depth))
+            .headers(
+                HeaderBuilder::new()
+                    .add_item("depth", depth)
+                    .unwrap()
+                    .build(),
+            )
             .body(body)
             .send()?
             .error_for_status()
