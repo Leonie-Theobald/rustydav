@@ -60,7 +60,7 @@ impl Client {
     fn start_request(&self, method: Method, path: &str) -> RequestBuilder {
         self.client
             .request(method, Url::parse(path).unwrap())
-            .basic_auth(self.username.as_str(), Some(self.password.as_str()))
+            .basic_auth(&self.username, Some(&self.password))
     }
 
     /// Get a file from Webdav server
@@ -156,7 +156,8 @@ mod tests {
     #[test]
     fn test_1_mkcol() {
         let webdav_client = get_client();
-        let result = webdav_client.mkcol(get_server_path("rustydav").as_str());
+
+        let result = webdav_client.mkcol(&get_server_path("new_collection"));
 
         assert!(result.is_ok());
     }
@@ -166,7 +167,7 @@ mod tests {
         let webdav_client = get_client();
         let result = webdav_client.put(
             "rustydav is a cool small library",
-            get_server_path("rustydav/test.txt").as_str(),
+            &get_server_path("test.txt"),
         );
 
         assert!(result.is_ok());
@@ -175,7 +176,8 @@ mod tests {
     #[test]
     fn test_3_get() {
         let webdav_client = get_client();
-        let result = webdav_client.get(get_server_path("rustydav/test.txt").as_str());
+
+        let result = webdav_client.get(&get_server_path("test.txt"));
 
         assert!(result.is_ok());
     }
@@ -184,8 +186,8 @@ mod tests {
     fn test_4_mv() {
         let webdav_client = get_client();
         let result = webdav_client.mv(
-            get_server_path("rustydav/test.txt").as_str(),
-            get_server_path("test.txt").as_str(),
+            &get_server_path("test.txt"),
+            &get_server_path("target/test.txt"),
         );
 
         assert!(result.is_ok());
@@ -194,7 +196,7 @@ mod tests {
     #[test]
     fn test_5_delete() {
         let webdav_client = get_client();
-        let result = webdav_client.delete(get_server_path("test.txt").as_str());
+        let result = webdav_client.delete(&get_server_path("test.txt"));
 
         assert!(result.is_ok());
     }
@@ -202,7 +204,7 @@ mod tests {
     #[test]
     fn test_6_unzip() {
         let webdav_client = get_client();
-        let result = webdav_client.unzip(get_server_path("test.zip").as_str());
+        let result = webdav_client.unzip(&get_server_path("test.zip"));
 
         assert!(result.is_ok());
     }
@@ -210,7 +212,7 @@ mod tests {
     #[test]
     fn test_7_list() {
         let webdav_client = get_client();
-        let result = webdav_client.list(get_server_path("").as_str(), "0");
+        let result = webdav_client.list(&get_server_path(""), "0");
 
         assert!(result.is_ok());
     }
