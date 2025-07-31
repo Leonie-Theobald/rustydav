@@ -45,7 +45,7 @@ Short examples of call methods
 if (result.is_ok() {
     // the method completed with success
 } else {
-    // somenting when wrong
+    // something went wrong
 }
 
 // Create the client

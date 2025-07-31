@@ -36,8 +36,10 @@
 //! ```ignore
 //! let webdav_client = client::Client::init("username", "password");
 //! ```
-//! Now you can use the client to call any of supported methods: **get**, **put**, **delete**, **unzip**, **mkcol**, **mv**, **list**.
-//! All the paths used by the methods should be absolute on the webdav server to the required file, folder, zip.
+//! Now you can use the client to call any of supported methods: **get**, **put**, **delete**,
+//! **unzip**, **mkcol**, **mv**, **list**.
+//! All the paths used by the methods should be absolute on the webdav server to the required file,
+//! folder, zip.
 //!
 //! Every method will return a Result<Response, Error>
 //! ```rust
@@ -45,13 +47,11 @@
 //! if result.is_ok() {
 //!    // the method completed with success
 //! } else {
-//!    // somenting when wrong
+//!    // something went wrong
 //! }
 //! ```
 
 extern crate reqwest;
 
-pub mod prelude;
 pub mod client;
-
-
+pub mod prelude;
