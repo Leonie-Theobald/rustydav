@@ -68,7 +68,9 @@ impl Client {
     ///
     /// Use absolute path to the webdav server file location
     pub fn get(&self, path: &str) -> Result<Response, Error> {
-        self.start_request(Method::GET, path).send()
+        self.start_request(Method::GET, path)
+            .send()?
+            .error_for_status()
     }
 
     /// Upload a file/zip on Webdav server
@@ -81,14 +83,17 @@ impl Client {
         self.start_request(Method::PUT, path)
             .headers(self.custom_header("content-type", "application/octet-stream"))
             .body(body)
-            .send()
+            .send()?
+            .error_for_status()
     }
 
     /// Deletes the collection, file, folder or zip archive at the given path on Webdav server
     ///
     /// Use absolute path to the webdav server file location
     pub fn delete(&self, path: &str) -> Result<Response, Error> {
-        self.start_request(Method::DELETE, path).send()
+        self.start_request(Method::DELETE, path)
+            .send()?
+            .error_for_status()
     }
 
     /// Unzips the .zip archieve on Webdav server
@@ -97,7 +102,8 @@ impl Client {
     pub fn unzip(&self, path: &str) -> Result<Response, Error> {
         self.start_request(Method::POST, path)
             .form(&self.form_params("method", "UNZIP"))
-            .send()
+            .send()?
+            .error_for_status()
     }
 
     /// Creates a directory on Webdav server
@@ -105,7 +111,8 @@ impl Client {
     /// Use absolute path to the webdav server file location
     pub fn mkcol(&self, path: &str) -> Result<Response, Error> {
         self.start_request(Method::from_bytes(b"MKCOL").unwrap(), path)
-            .send()
+            .send()?
+            .error_for_status()
     }
 
     /// Rename or move a collection, file, folder on Webdav server
@@ -116,7 +123,8 @@ impl Client {
     pub fn mv(&self, from: &str, to: &str) -> Result<Response, Error> {
         self.start_request(Method::from_bytes(b"MOVE").unwrap(), from)
             .headers(self.custom_header("destination", to))
-            .send()
+            .send()?
+            .error_for_status()
     }
 
     /// List files and folders at the given path on Webdav server
@@ -135,7 +143,8 @@ impl Client {
         self.start_request(Method::from_bytes(b"PROPFIND").unwrap(), path)
             .headers(self.custom_header("depth", depth))
             .body(body)
-            .send()
+            .send()?
+            .error_for_status()
     }
 }
 
