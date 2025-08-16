@@ -23,6 +23,7 @@ use super::prelude::*;
 #[cfg(feature = "locking")]
 use crate::file_lock::LockToken;
 use crate::{error::WebdavError, header::HeaderBuilder};
+use log::debug;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -223,8 +224,10 @@ impl Client {
                     .build(),
             )
             .body(body)
-            .send()?
-            .error_for_status()?;
+            .send()
+            .inspect(|content| debug!("lock-send: {content:?}"))?
+            .error_for_status()
+            .inspect(|content| debug!("lock-error-for-status: {content:?}"))?;
 
         match LockToken::extract_from_response(&response) {
             None => Err(WebdavError::LockingFailed),
